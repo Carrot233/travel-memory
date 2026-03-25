@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 简约清新的自定义样式 */
+.btn-primary {
+  @apply bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-full transition-all duration-300 shadow-md hover:shadow-lg;
+}
+
+.card {
+  @apply bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden transition-transform duration-300 hover:scale-[1.02];
+}
+
+.input-field {
+  @apply w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800;
+}
