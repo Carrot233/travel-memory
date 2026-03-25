@@ -45,16 +45,23 @@ cd travel-memory
 npm install
 ```
 
-### 3. 配置环境变量（可选）
+### 3. 配置环境变量
 
-如需修改配置，可创建 `.env.local` 文件：
+必须创建 `.env.local` 文件配置高德地图 API Key：
 
 ```bash
-# 高德地图 API Key（如需修改）
-AMAP_KEY=your_amap_key_here
+# 创建环境变量文件
+cp .env.example .env.local
+
+# 编辑 .env.local，填入你的高德地图 Key
+AMAP_KEY=你的高德地图API密钥
 ```
 
-> 注意：高德地图 API Key 已预配置，如需更换请到 [高德开放平台](https://lbs.amap.com/) 申请。
+获取高德地图 API Key：
+1. 访问 [高德开放平台](https://lbs.amap.com/)
+2. 注册/登录后创建应用
+3. 添加 Web端JS API 服务
+4. 复制 Key 填入上方配置
 
 ### 4. 启动开发服务器
 
