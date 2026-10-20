@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const routeId = searchParams.get("route_id");
   
   let query = "SELECT * FROM photos";
-  let params: any[] = [];
+  const params: string[] = [];
   
   if (routeId) {
     query += " WHERE route_id = ?";

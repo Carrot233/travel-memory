@@ -28,8 +28,8 @@ async function geocodeSpot(spotName: string, cityName?: string): Promise<{ lat: 
       const data: GeocodeResult[] = await res.json();
       if (data && data.length > 0) {
         return {
-          lat: parseFloat(data[0].lat),
-          lon: parseFloat(data[0].lon)
+          lat: data[0].lat,
+          lon: data[0].lon
         };
       }
     } catch (error) {

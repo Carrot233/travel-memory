@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import bcrypt from "bcryptjs";
 import path from "path";
 
 const dbPath = path.join(process.cwd(), "data", "travel.db");
@@ -115,7 +116,6 @@ export function initDatabase() {
   // 创建默认管理员账号
   const adminExists = db.prepare("SELECT id FROM users WHERE username = ?").get("admin");
   if (!adminExists) {
-    const bcrypt = require("bcryptjs");
     const hashedPassword = bcrypt.hashSync("mkkong", 10);
     db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("admin", hashedPassword, "admin");
     console.log("✅ 默认管理员账号已创建: admin / mkkong");

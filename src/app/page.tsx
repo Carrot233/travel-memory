@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import db, { initDatabase } from "@/lib/db";
 import CTASection from "@/components/CTASection";
+import type { Photo, Route } from "@/types";
 
 // 强制动态渲染，确保数据实时更新
 export const dynamic = 'force-dynamic';
@@ -17,8 +18,12 @@ export default function HomePage() {
   const storyCount = db.prepare("SELECT COUNT(*) as count FROM stories").get() as { count: number };
 
   // 获取最新内容
-  const latestPhotos = db.prepare("SELECT * FROM photos ORDER BY created_at DESC LIMIT 4").all() as any[];
-  const latestRoutes = db.prepare("SELECT * FROM routes ORDER BY created_at DESC LIMIT 3").all() as any[];
+  const latestPhotos = db
+    .prepare("SELECT * FROM photos ORDER BY created_at DESC LIMIT 4")
+    .all() as Photo[];
+  const latestRoutes = db
+    .prepare("SELECT * FROM routes ORDER BY created_at DESC LIMIT 3")
+    .all() as Route[];
 
   return (
     <div className="min-h-screen">

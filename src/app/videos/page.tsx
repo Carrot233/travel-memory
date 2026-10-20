@@ -1,5 +1,6 @@
 import Link from "next/link";
 import db, { initDatabase } from "@/lib/db";
+import type { Video } from "@/types";
 
 initDatabase();
 
@@ -7,7 +8,9 @@ initDatabase();
 export const dynamic = 'force-dynamic';
 
 export default function VideosPage() {
-  const videos = db.prepare("SELECT * FROM videos ORDER BY created_at DESC").all() as any[];
+  const videos = db
+    .prepare("SELECT * FROM videos ORDER BY created_at DESC")
+    .all() as Video[];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
@@ -23,7 +26,7 @@ export default function VideosPage() {
                 <div className="aspect-video bg-black">
                   <video
                     src={video.url}
-                    poster={video.thumbnail_url}
+                    poster={video.thumbnail_url ?? undefined}
                     controls
                     className="w-full h-full"
                   />

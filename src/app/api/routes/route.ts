@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import db, { initDatabase } from "@/lib/db";
 
+interface RouteSpotInput {
+  name: string;
+  description?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  day_number?: number;
+  order_index?: number;
+  image_url?: string | null;
+}
+
 initDatabase();
 
 export async function GET() {
@@ -28,7 +38,7 @@ export async function POST(request: Request) {
       const insertSpot = db.prepare(
         "INSERT INTO route_spots (route_id, name, description, latitude, longitude, day_number, order_index, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
       );
-      spots.forEach((spot: any) => {
+      spots.forEach((spot: RouteSpotInput) => {
         insertSpot.run(
           routeId,
           spot.name,

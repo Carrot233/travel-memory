@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import db, { initDatabase } from "@/lib/db";
 
+interface UserWithPassword {
+  id: number;
+  username: string;
+  password: string;
+  role: "admin" | "user";
+  created_at: string;
+}
+
 // 初始化数据库
 initDatabase();
 
@@ -16,7 +24,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
+    const user = db
+      .prepare("SELECT * FROM users WHERE username = ?")
+      .get(username) as UserWithPassword | undefined;
 
     if (!user) {
       return NextResponse.json(

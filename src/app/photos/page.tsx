@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import db, { initDatabase } from "@/lib/db";
+import type { Photo } from "@/types";
 
 initDatabase();
 
@@ -8,7 +9,9 @@ initDatabase();
 export const dynamic = 'force-dynamic';
 
 export default function PhotosPage() {
-  const photos = db.prepare("SELECT * FROM photos ORDER BY created_at DESC").all() as any[];
+  const photos = db
+    .prepare("SELECT * FROM photos ORDER BY created_at DESC")
+    .all() as Photo[];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">

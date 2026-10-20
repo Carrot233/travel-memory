@@ -1,17 +1,101 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const AMAP_KEY = "9b7352f8a857e05961715ee592ca9a6c";
 const AMAP_SECURITY_CODE = "5cd7952e154775d411353e2b8c4cdd01";
 
+interface SelectedLocation {
+  name: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+}
+
+type LocationSelectHandler = (location: SelectedLocation) => void;
+
+interface AMapLngLat {
+  lng: number;
+  lat: number;
+}
+
+interface AMapMapOptions {
+  zoom: number;
+  center: [number, number];
+}
+
+interface AMapMarkerOptions {
+  position: [number, number] | null;
+  draggable: boolean;
+}
+
+interface AMapAutoCompleteOptions {
+  city: string;
+  citylimit: boolean;
+  type: string;
+}
+
+interface AMapMap {
+  destroy(): void;
+  setCenter(position: [number, number]): void;
+  setZoom(zoom: number): void;
+  on(event: "click", listener: (event: { lnglat: AMapLngLat }) => void): void;
+}
+
+interface AMapMarker {
+  getPosition(): AMapLngLat;
+  setMap(map: AMapMap): void;
+  setPosition(position: [number, number]): void;
+  on(event: "dragend", listener: () => void): void;
+}
+
+interface AMapSearchTip {
+  name: string;
+  address?: string;
+  district?: string;
+  location?: AMapLngLat;
+}
+
+interface AMapSearchResult {
+  tips?: AMapSearchTip[];
+}
+
+interface AMapGeocodeResult {
+  regeocode?: {
+    formattedAddress: string;
+    pois?: Array<{ name?: string }>;
+  };
+}
+
+interface AMapAutoComplete {
+  search(
+    keyword: string,
+    callback: (status: string, result: AMapSearchResult) => void
+  ): void;
+}
+
+interface AMapGeocoder {
+  getAddress(
+    position: [number, number],
+    callback: (status: string, result: AMapGeocodeResult) => void
+  ): void;
+}
+
+interface AMapNamespace {
+  Map: new (container: HTMLElement, options: AMapMapOptions) => AMapMap;
+  Marker: new (options: AMapMarkerOptions) => AMapMarker;
+  AutoComplete: new (options: AMapAutoCompleteOptions) => AMapAutoComplete;
+  Geocoder: new () => AMapGeocoder;
+}
+
+interface InitializedMap {
+  map: AMapMap;
+  marker: AMapMarker;
+  autoComplete: AMapAutoComplete;
+}
+
 interface LocationPickerProps {
-  onLocationSelect: (location: {
-    name: string;
-    latitude: number;
-    longitude: number;
-    address?: string;
-  }) => void;
+  onLocationSelect: LocationSelectHandler;
   initialLatitude?: number | null;
   initialLongitude?: number | null;
   initialName?: string;
@@ -19,9 +103,84 @@ interface LocationPickerProps {
 
 declare global {
   interface Window {
-    AMap: any;
-    _AMapSecurityConfig: { securityJsCode: string };
+    AMap?: AMapNamespace;
+    _AMapSecurityConfig?: { securityJsCode: string };
   }
+}
+
+function initializeMap({
+  container,
+  initialLatitude,
+  initialLongitude,
+  initialName,
+  onLocationSelect,
+}: {
+  container: HTMLElement;
+  initialLatitude?: number | null;
+  initialLongitude?: number | null;
+  initialName?: string;
+  onLocationSelect: LocationSelectHandler;
+}): InitializedMap | null {
+  const amap = window.AMap;
+  if (!amap) {
+    return null;
+  }
+
+  const mapInstance = new amap.Map(container, {
+    zoom: 5,
+    center: [121.473701, 31.230416],
+  });
+
+  const markerInstance = new amap.Marker({
+    position: null,
+    draggable: true,
+  });
+
+  const autoComplete = new amap.AutoComplete({
+    city: "全国",
+    citylimit: false,
+    type: "风景名胜|商务住宅|风景名胜|交通设施",
+  });
+
+  if (initialLatitude && initialLongitude) {
+    const position: [number, number] = [initialLongitude, initialLatitude];
+    markerInstance.setPosition(position);
+    markerInstance.setMap(mapInstance);
+    mapInstance.setCenter(position);
+    mapInstance.setZoom(12);
+  }
+
+  mapInstance.on("click", ({ lnglat }) => {
+    const { lng, lat } = lnglat;
+    markerInstance.setPosition([lng, lat]);
+    markerInstance.setMap(mapInstance);
+
+    const geocoder = new amap.Geocoder();
+    geocoder.getAddress([lng, lat], (status, result) => {
+      if (status === "complete" && result.regeocode) {
+        const address = result.regeocode.formattedAddress;
+        const name = initialName || result.regeocode.pois?.[0]?.name || address;
+        onLocationSelect({ name, latitude: lat, longitude: lng, address });
+      } else {
+        onLocationSelect({
+          name: initialName || "选中位置",
+          latitude: lat,
+          longitude: lng,
+        });
+      }
+    });
+  });
+
+  markerInstance.on("dragend", () => {
+    const position = markerInstance.getPosition();
+    onLocationSelect({
+      name: initialName || "选中位置",
+      latitude: position.lat,
+      longitude: position.lng,
+    });
+  });
+
+  return { map: mapInstance, marker: markerInstance, autoComplete };
 }
 
 export default function LocationPicker({
@@ -31,123 +190,111 @@ export default function LocationPicker({
   initialName,
 }: LocationPickerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<any>(null);
-  const [marker, setMarker] = useState<any>(null);
+  const [map, setMap] = useState<AMapMap | null>(null);
+  const [marker, setMarker] = useState<AMapMarker | null>(null);
   const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<AMapSearchTip[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const autoCompleteRef = useRef<any>(null);
+  const autoCompleteRef = useRef<AMapAutoComplete | null>(null);
+  const optionsRef = useRef({
+    onLocationSelect,
+    initialLatitude,
+    initialLongitude,
+    initialName,
+  });
+
+  useEffect(() => {
+    optionsRef.current = {
+      onLocationSelect,
+      initialLatitude,
+      initialLongitude,
+      initialName,
+    };
+  }, [onLocationSelect, initialLatitude, initialLongitude, initialName]);
 
   // 加载高德地图 SDK（带安全密钥）
   useEffect(() => {
-    // 设置安全密钥配置
     window._AMapSecurityConfig = {
       securityJsCode: AMAP_SECURITY_CODE,
     };
 
-    const existingScript = document.querySelector('script[src*="webapi.amap.com"]');
+    let active = true;
+    let mapInstance: AMapMap | null = null;
+    let script: HTMLScriptElement | null = null;
+
+    const startMap = () => {
+      if (!active || !mapRef.current) {
+        return;
+      }
+
+      try {
+        const initialized = initializeMap({
+          container: mapRef.current,
+          ...optionsRef.current,
+        });
+
+        if (!initialized) {
+          setError("地图初始化失败");
+          return;
+        }
+
+        mapInstance = initialized.map;
+        autoCompleteRef.current = initialized.autoComplete;
+        setMap(initialized.map);
+        setMarker(initialized.marker);
+        setLoading(false);
+        setError(null);
+      } catch (err) {
+        console.error("地图初始化错误:", err);
+        setError("地图初始化失败");
+      }
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src*="webapi.amap.com"]'
+    );
+
     if (existingScript) {
       if (window.AMap) {
-        initMap();
+        startMap();
+      } else {
+        existingScript.addEventListener("load", startMap, { once: true });
       }
-      return;
+    } else {
+      script = document.createElement("script");
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.AutoComplete,AMap.Geocoder`;
+      script.async = true;
+      script.onload = startMap;
+      script.onerror = () => {
+        setError("地图加载失败，请刷新页面重试");
+      };
+      document.head.appendChild(script);
     }
 
-    const script = document.createElement("script");
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.AutoComplete,AMap.Geocoder`;
-    script.async = true;
-    script.onload = () => {
-      initMap();
-    };
-    script.onerror = () => {
-      setError("地图加载失败，请刷新页面重试");
-    };
-    document.head.appendChild(script);
-
     return () => {
-      if (map) {
-        map.destroy();
+      active = false;
+      existingScript?.removeEventListener("load", startMap);
+      if (script) {
+        script.onload = null;
+        script.onerror = null;
       }
+      mapInstance?.destroy();
+      mapInstance = null;
+      autoCompleteRef.current = null;
     };
   }, []);
 
-  // 初始化地图
-  const initMap = useCallback(() => {
-    if (!mapRef.current || !window.AMap) {
-      setError("地图初始化失败");
-      return;
-    }
-
-    try {
-      const mapInstance = new window.AMap.Map(mapRef.current, {
-        zoom: 5,
-        center: [121.473701, 31.230416],
-      });
-
-      const markerInstance = new window.AMap.Marker({
-        position: null,
-        draggable: true,
-      });
-
-      // 使用 AutoComplete 进行模糊搜索
-      const autoComplete = new window.AMap.AutoComplete({
-        city: "全国",
-        citylimit: false,
-        type: "风景名胜|商务住宅|风景名胜|交通设施",
-      });
-
-      autoCompleteRef.current = autoComplete;
-      setMap(mapInstance);
-      setMarker(markerInstance);
-      setLoading(false);
-      setError(null);
-
-      if (initialLatitude && initialLongitude) {
-        const position = [initialLongitude, initialLatitude];
-        markerInstance.setPosition(position);
-        markerInstance.setMap(mapInstance);
-        mapInstance.setCenter(position);
-        mapInstance.setZoom(12);
-      }
-
-      // 点击地图选择
-      mapInstance.on("click", async (e: any) => {
-        const { lng, lat } = e.lnglat;
-        markerInstance.setPosition([lng, lat]);
-        markerInstance.setMap(mapInstance);
-
-        const geocoder = new window.AMap.Geocoder();
-        geocoder.getAddress([lng, lat], (status: string, result: any) => {
-          if (status === "complete" && result.regeocode) {
-            const address = result.regeocode.formattedAddress;
-            const name = initialName || result.regeocode.pois?.[0]?.name || address;
-            onLocationSelect({ name, latitude: lat, longitude: lng, address });
-          } else {
-            onLocationSelect({ name: initialName || "选中位置", latitude: lat, longitude: lng });
-          }
-        });
-      });
-
-      markerInstance.on("dragend", () => {
-        const position = markerInstance.getPosition();
-        onLocationSelect({ name: initialName || "选中位置", latitude: position.lat, longitude: position.lng });
-      });
-    } catch (err) {
-      console.error("地图初始化错误:", err);
-      setError("地图初始化失败");
-    }
-  }, [initialLatitude, initialLongitude, initialName, onLocationSelect]);
-
   // 搜索
   const handleSearch = () => {
-    if (!searchText.trim() || !autoCompleteRef.current) return;
+    const autoComplete = autoCompleteRef.current;
+    if (!searchText.trim() || !autoComplete) return;
 
-    autoCompleteRef.current.search(searchText, (status: string, result: any) => {
+    autoComplete.search(searchText, (status, result) => {
       if (status === "complete" && result.tips) {
         const validResults = result.tips
-          .filter((tip: any) => tip.location && tip.location.lng && tip.location.lat)
+          .filter((tip) => tip.location && tip.location.lng && tip.location.lat)
           .slice(0, 5);
         
         if (validResults.length > 0) {
@@ -167,8 +314,10 @@ export default function LocationPicker({
   };
 
   // 选择结果
-  const handleSelectResult = (poi: any) => {
+  const handleSelectResult = (poi: AMapSearchTip) => {
     const { name, location, address, district } = poi;
+    if (!map || !marker || !location) return;
+
     map.setCenter([location.lng, location.lat]);
     map.setZoom(15);
     marker.setPosition([location.lng, location.lat]);
