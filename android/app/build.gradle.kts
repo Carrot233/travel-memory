@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -15,6 +17,8 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val amapKey = readBuildSetting("AMAP_KEY")
+        buildConfigField("String", "AMAP_KEY", "\"$amapKey\"")
     }
 
     compileOptions {
@@ -24,6 +28,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -69,4 +74,20 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.core)
+}
+
+private fun readBuildSetting(name: String): String {
+    val fromGradle = project.findProperty(name) as String?
+    val fromEnv = System.getenv(name)
+    val localFile = rootProject.file("local.properties")
+    val fromLocal = if (localFile.isFile) {
+        Properties().apply {
+            localFile.inputStream().use { load(it) }
+        }.getProperty(name)
+    } else {
+        null
+    }
+    return (fromGradle ?: fromEnv ?: fromLocal ?: "")
+        .trim()
+        .filter { it.isLetterOrDigit() || it == '_' || it == '-' }
 }

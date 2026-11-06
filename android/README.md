@@ -2,7 +2,7 @@
 
 This is a standalone, offline-first Android app for 旅途记忆. It does not call the Next.js website, `/api` routes, or any server. There is no server-URL setting. Photos, routes, videos, and stories are stored on the device with Room and app-private files, and they remain after the app is force-stopped.
 
-构建时 Gradle 会下载依赖，这只发生在开发机器上。安装之后，应用本身不需要网络。
+构建时 Gradle 会下载依赖，这只发生在开发机器上。照片、路线、视频和故事仍保存在本机。给路线添加景点时，如果配置了高德 Web 服务 Key，可以用地名搜索；没有 Key 时改为手填经纬度。搜索不使用定位权限。
 
 ## 打开和运行
 
@@ -30,7 +30,8 @@ cd android
 - 元数据在本机 Room 数据库 `travel_memory.db`。
 - 照片、视频和封面复制到应用私有目录 `files/media/`，不依赖相册里的原文件是否还在。
 - 可以新增、编辑、删除照片、路线、视频和故事。
-- 路线图用景点的经纬度在本地画出来，不使用高德或 Google Maps，也不需要地图密钥。
+- 路线图用景点的经纬度在本地画出来，不使用地图 SDK。
+- 添加或编辑景点时可以搜索地名。搜索走高德输入提示接口（和网站 `LocationPicker` 的 AutoComplete 相同）。Key 不写进代码：在 `android/local.properties`（已忽略）或 Gradle 参数里设置 `AMAP_KEY`。示例见 `local.properties.example`。未配置时应用会提示搜索不可用，经纬度仍可手填。
 - 深色模式在「设置」里切换，可跟随系统。
 - 没有登录，也没有账号服务器。
 

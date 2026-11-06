@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -55,6 +56,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.carrot233.travelmemory.data.SpotDraft
 import com.carrot233.travelmemory.data.formatCoord
+import com.carrot233.travelmemory.data.place.AmapPlaceSearch
+import com.carrot233.travelmemory.data.place.PlaceSearchOutcome
+import com.carrot233.travelmemory.data.place.PlaceSuggestion
+import java.util.Locale
 import com.carrot233.travelmemory.ui.Routes
 import com.carrot233.travelmemory.ui.components.ConfirmDeleteDialog
 import com.carrot233.travelmemory.ui.components.EmptyHint
@@ -338,17 +343,97 @@ private fun SpotDialog(
     var day by remember { mutableStateOf((initial?.dayNumber ?: 1).toString()) }
     var latitude by remember { mutableStateOf(initial?.latitude?.let { formatCoord(it) }.orEmpty()) }
     var longitude by remember { mutableStateOf(initial?.longitude?.let { formatCoord(it) }.orEmpty()) }
+    var placeQuery by remember { mutableStateOf("") }
+    var searching by remember { mutableStateOf(false) }
+    var searchNote by remember { mutableStateOf<String?>(null) }
+    var suggestions by remember { mutableStateOf<List<PlaceSuggestion>>(emptyList()) }
+    val searchReady = remember { AmapPlaceSearch.isConfigured() }
+    val scope = rememberCoroutineScope()
+    fun searchPlace() {
+        if (!searchReady || placeQuery.isBlank() || searching) return
+        scope.launch {
+            searching = true
+            searchNote = null
+            when (val outcome = AmapPlaceSearch.search(placeQuery)) {
+                PlaceSearchOutcome.Unavailable -> {
+                    suggestions = emptyList()
+                    searchNote = "地点搜索不可用：构建时未配置 AMAP_KEY。仍可手动填写经纬度。"
+                }
+                PlaceSearchOutcome.Empty -> {
+                    suggestions = emptyList()
+                    searchNote = "未找到相关地点"
+                }
+                is PlaceSearchOutcome.Failed -> {
+                    suggestions = emptyList()
+                    searchNote = outcome.message
+                }
+                is PlaceSearchOutcome.Hits -> {
+                    suggestions = outcome.places
+                    searchNote = "找到 ${outcome.places.size} 个结果，点击选择"
+                }
+            }
+            searching = false
+        }
+    }
+    fun applySuggestion(place: PlaceSuggestion) {
+        name = place.name
+        latitude = String.format(Locale.US, "%.6f", place.latitude)
+        longitude = String.format(Locale.US, "%.6f", place.longitude)
+        suggestions = emptyList()
+        searchNote = place.subtitle().ifBlank { "已填入坐标" }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "添加景点" else "编辑景点") },
         text = {
-            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (searchReady) {
+                    TravelField("搜索地点", placeQuery, { placeQuery = it })
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(enabled = !searching && placeQuery.isNotBlank(), onClick = { searchPlace() }) {
+                            Text("搜索")
+                        }
+                        if (searching) {
+                            CircularProgressIndicator(Modifier.size(18.dp))
+                        }
+                    }
+                } else {
+                    Text(
+                        "地点搜索不可用：构建时未配置 AMAP_KEY。仍可手动填写经纬度。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                suggestions.forEach { place ->
+                    TextButton(onClick = { applySuggestion(place) }, modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(place.name, style = MaterialTheme.typography.titleSmall)
+                            val subtitle = place.subtitle()
+                            if (subtitle.isNotBlank()) {
+                                Text(
+                                    subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (searchNote != null && suggestions.isEmpty()) {
+                    Text(searchNote!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 TravelField("名称", name, { name = it })
                 TravelField("第几天", day, { day = it.filter { ch -> ch.isDigit() }.take(3) }, keyboardType = KeyboardType.Number)
                 TravelField("纬度", latitude, { latitude = it }, keyboardType = KeyboardType.Decimal)
                 TravelField("经度", longitude, { longitude = it }, keyboardType = KeyboardType.Decimal)
                 TravelField("描述", description, { description = it }, singleLine = false, minLines = 2)
-                Text("经纬度可以留空。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "可搜索地名后点选，或直接填写经纬度。经纬度可以留空。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         },
         confirmButton = {
