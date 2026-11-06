@@ -21,6 +21,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE route_id = :routeId ORDER BY created_at DESC")
     fun observeForRoute(routeId: Long): Flow<List<PhotoEntity>>
 
+    @Query("SELECT * FROM photos WHERE id IN (:ids)")
+    fun observeByIds(ids: List<Long>): Flow<List<PhotoEntity>>
+
     @Query("SELECT COUNT(*) FROM photos")
     fun observeCount(): Flow<Int>
 
@@ -47,6 +50,9 @@ interface RouteDao {
 
     @Query("SELECT * FROM routes WHERE id = :id")
     suspend fun get(id: Long): RouteEntity?
+
+    @Query("SELECT * FROM routes WHERE id IN (:ids)")
+    fun observeByIds(ids: List<Long>): Flow<List<RouteEntity>>
 
     @Query("SELECT COUNT(*) FROM routes")
     fun observeCount(): Flow<Int>

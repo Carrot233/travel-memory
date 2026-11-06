@@ -6,6 +6,9 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.math.max
 
@@ -44,6 +47,18 @@ class TravelRepository(
     fun observeStory(id: Long): Flow<StoryEntity?> = database.storyDao().observe(id)
 
     fun observeStoryCount(): Flow<Int> = database.storyDao().observeCount()
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun observeStoryPhotos(storyId: Long): Flow<List<PhotoEntity>> =
+        database.storyDao().observe(storyId).flatMapLatest { story ->
+            orderedPhotos(parseIdList(story?.photoIds))
+        }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun observeStoryRoutes(storyId: Long): Flow<List<RouteEntity>> =
+        database.storyDao().observe(storyId).flatMapLatest { story ->
+            orderedRoutes(parseIdList(story?.routeIds))
+        }
 
     suspend fun getPhoto(id: Long): PhotoEntity? = database.photoDao().get(id)
 
@@ -164,6 +179,8 @@ class TravelRepository(
         require(content.isNotEmpty()) { "请写下故事内容" }
         val location = draft.location.blankToNull()
         val cover = draft.coverUrl.blankToNull()
+        val photoIds = encodeIdList(draft.photoIds)
+        val routeIds = encodeIdList(draft.routeIds)
         if (draft.id == null) {
             return database.storyDao().insert(
                 StoryEntity(
@@ -171,6 +188,8 @@ class TravelRepository(
                     content = content,
                     coverUrl = cover,
                     location = location,
+                    photoIds = photoIds,
+                    routeIds = routeIds,
                     createdAt = nowStamp(),
                 ),
             )
@@ -182,6 +201,8 @@ class TravelRepository(
                 content = content,
                 coverUrl = cover,
                 location = location,
+                photoIds = photoIds,
+                routeIds = routeIds,
             ),
         )
         if (existing.coverUrl != cover) release(existing.coverUrl)
@@ -262,6 +283,22 @@ class TravelRepository(
         val route = database.routeDao().get(id) ?: return
         database.routeDao().delete(route)
         release(route.coverUrl)
+    }
+
+    private fun orderedPhotos(ids: List<Long>): Flow<List<PhotoEntity>> {
+        if (ids.isEmpty()) return flowOf(emptyList())
+        return database.photoDao().observeByIds(ids).map { photos ->
+            val byId = photos.associateBy { it.id }
+            ids.mapNotNull { byId[it] }
+        }
+    }
+
+    private fun orderedRoutes(ids: List<Long>): Flow<List<RouteEntity>> {
+        if (ids.isEmpty()) return flowOf(emptyList())
+        return database.routeDao().observeByIds(ids).map { routes ->
+            val byId = routes.associateBy { it.id }
+            ids.mapNotNull { byId[it] }
+        }
     }
 
     private suspend fun release(path: String?) {

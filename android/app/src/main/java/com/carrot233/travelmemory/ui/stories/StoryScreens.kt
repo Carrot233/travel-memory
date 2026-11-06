@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -126,6 +129,8 @@ fun StoryListScreen(nav: NavHostController) {
 fun StoryDetailScreen(nav: NavHostController, storyId: Long) {
     val repository = travelRepository()
     val story by remember(storyId) { repository.observeStory(storyId) }.collectAsStateWithLifecycle(null)
+    val photos by remember(storyId) { repository.observeStoryPhotos(storyId) }.collectAsStateWithLifecycle(emptyList())
+    val routes by remember(storyId) { repository.observeStoryRoutes(storyId) }.collectAsStateWithLifecycle(emptyList())
     val scope = rememberCoroutineScope()
     var confirm by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
@@ -168,6 +173,35 @@ fun StoryDetailScreen(nav: NavHostController, storyId: Long) {
                 SelectionContainer {
                     Text(current.content)
                 }
+                if (photos.isNotEmpty()) {
+                    Text("相关照片", style = MaterialTheme.typography.titleLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        photos.forEach { photo ->
+                            Card(onClick = { nav.navigate("photo/${photo.id}") }, modifier = Modifier.width(108.dp)) {
+                                MediaImage(
+                                    relativePath = photo.url,
+                                    description = photo.title,
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                                )
+                                Text(
+                                    photo.title,
+                                    modifier = Modifier.padding(6.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (routes.isNotEmpty()) {
+                    Text("相关路线", style = MaterialTheme.typography.titleLarge)
+                    routes.forEach { route ->
+                        Card(onClick = { nav.navigate("route/${route.id}") }, modifier = Modifier.fillMaxWidth()) {
+                            Text(route.title, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
             }
         }
     }
@@ -191,6 +225,8 @@ fun StoryDetailScreen(nav: NavHostController, storyId: Long) {
 @Composable
 fun StoryEditScreen(nav: NavHostController, storyId: Long?) {
     val editor = editorViewModel(key = "story-$storyId") { StoryEditorViewModel(it, storyId) }
+    val libraryPhotos by editor.photos.collectAsStateWithLifecycle()
+    val libraryRoutes by editor.routes.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val pickCover = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -244,6 +280,40 @@ fun StoryEditScreen(nav: NavHostController, storyId: Long?) {
                     TravelField("标题", editor.title, { editor.title = it })
                     TravelField("地点", editor.location, { editor.location = it })
                     TravelField("正文", editor.content, { editor.content = it }, singleLine = false, minLines = 8)
+                    Text("关联照片", style = MaterialTheme.typography.titleMedium)
+                    if (libraryPhotos.isEmpty()) {
+                        Text("相册里还没有照片。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            libraryPhotos.forEach { photo ->
+                                val selected = photo.id in editor.selectedPhotoIds
+                                Card(onClick = { editor.togglePhoto(photo.id) }, modifier = Modifier.width(96.dp)) {
+                                    MediaImage(
+                                        relativePath = photo.url,
+                                        description = photo.title,
+                                        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                                    )
+                                    Text(
+                                        if (selected) "已选 · ${photo.title}" else photo.title,
+                                        modifier = Modifier.padding(6.dp),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (libraryRoutes.isNotEmpty()) {
+                        Text("关联路线", style = MaterialTheme.typography.titleMedium)
+                        libraryRoutes.forEach { route ->
+                            val selected = route.id in editor.selectedRouteIds
+                            TextButton(onClick = { editor.toggleRoute(route.id) }) {
+                                Text(if (selected) "已选 · ${route.title}" else route.title)
+                            }
+                        }
+                    }
                 }
             }
         }

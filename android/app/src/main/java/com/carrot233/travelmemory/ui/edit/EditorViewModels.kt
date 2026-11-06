@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.carrot233.travelmemory.data.MediaKind
 import com.carrot233.travelmemory.data.PhotoDraft
+import com.carrot233.travelmemory.data.parseIdList
 import com.carrot233.travelmemory.data.RouteDraft
 import com.carrot233.travelmemory.data.SpotDraft
 import com.carrot233.travelmemory.data.StoryDraft
@@ -221,6 +222,10 @@ class StoryEditorViewModel(
     var missing by mutableStateOf(false)
     var saving by mutableStateOf(false)
     var message by mutableStateOf<String?>(null)
+    val photos = repository.observePhotos().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val routes = repository.observeRoutes().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val selectedPhotoIds = mutableStateListOf<Long>()
+    val selectedRouteIds = mutableStateListOf<Long>()
 
     init {
         if (storyId != null) {
@@ -234,10 +239,22 @@ class StoryEditorViewModel(
                     location = story.location.orEmpty()
                     coverPath = story.coverUrl
                     originalCover = story.coverUrl
+                    selectedPhotoIds.clear()
+                    selectedPhotoIds.addAll(parseIdList(story.photoIds))
+                    selectedRouteIds.clear()
+                    selectedRouteIds.addAll(parseIdList(story.routeIds))
                 }
                 loading = false
             }
         }
+    }
+
+    fun togglePhoto(photoId: Long) {
+        if (photoId in selectedPhotoIds) selectedPhotoIds.remove(photoId) else selectedPhotoIds.add(photoId)
+    }
+
+    fun toggleRoute(routeId: Long) {
+        if (routeId in selectedRouteIds) selectedRouteIds.remove(routeId) else selectedRouteIds.add(routeId)
     }
 
     fun importCover(context: Context, uri: Uri) {
@@ -285,6 +302,8 @@ class StoryEditorViewModel(
                         content = content,
                         location = location,
                         coverUrl = coverPath,
+                        photoIds = selectedPhotoIds.toList(),
+                        routeIds = selectedRouteIds.toList(),
                     ),
                 )
                 originalCover = coverPath

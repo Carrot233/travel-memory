@@ -81,6 +81,7 @@ class WebsiteZipImporter(
         var missing = 0
         val routeIds = HashMap<Long, Long>()
         val spotIds = HashMap<Long, Long>()
+        val photoIds = HashMap<Long, Long>()
 
         database.withTransaction {
             for (route in dump.routes) {
@@ -136,13 +137,15 @@ class WebsiteZipImporter(
             }
 
             for (photo in dump.photos) {
-                if (database.photoDao().idBySourceKey(photo.sourceKey) != null) {
+                val existingPhoto = database.photoDao().idBySourceKey(photo.sourceKey)
+                if (existingPhoto != null) {
+                    photoIds[photo.oldId] = existingPhoto
                     skipped++
                     continue
                 }
                 val copied = copyMedia(zip, names, photo.sourceKey, photo.url, MediaKind.PHOTO)
                 if (photo.url != null && copied == null) missing++
-                database.photoDao().insert(
+                val id = database.photoDao().insert(
                     PhotoEntity(
                         title = photo.title,
                         description = photo.description,
@@ -155,6 +158,7 @@ class WebsiteZipImporter(
                         sourceKey = photo.sourceKey,
                     ),
                 )
+                photoIds[photo.oldId] = id
                 photos++
             }
 
@@ -185,7 +189,16 @@ class WebsiteZipImporter(
             }
 
             for (story in dump.stories) {
-                if (database.storyDao().idBySourceKey(story.sourceKey) != null) {
+                val linkedPhotos = linkedIds(story.photoIds, photoIds, "website:photo:")
+                val linkedRoutes = linkedIds(story.routeIds, routeIds, "website:route:")
+                val existingId = database.storyDao().idBySourceKey(story.sourceKey)
+                if (existingId != null) {
+                    val existing = database.storyDao().get(existingId)
+                    if (existing != null) {
+                        database.storyDao().update(
+                            existing.copy(photoIds = linkedPhotos, routeIds = linkedRoutes),
+                        )
+                    }
                     skipped++
                     continue
                 }
@@ -197,6 +210,8 @@ class WebsiteZipImporter(
                         content = story.content,
                         coverUrl = cover,
                         location = story.location,
+                        photoIds = linkedPhotos,
+                        routeIds = linkedRoutes,
                         createdAt = story.createdAt ?: nowStamp(),
                         sourceKey = story.sourceKey,
                     ),
@@ -206,6 +221,17 @@ class WebsiteZipImporter(
         }
 
         return ImportResult(photos, routes, spots, videos, stories, skipped, missing)
+    }
+
+    private suspend fun linkedIds(oldIds: List<Long>, known: Map<Long, Long>, sourcePrefix: String): String? {
+        val local = oldIds.mapNotNull { oldId ->
+            known[oldId] ?: when {
+                sourcePrefix.endsWith("photo:") -> database.photoDao().idBySourceKey("$sourcePrefix$oldId")
+                sourcePrefix.endsWith("route:") -> database.routeDao().idBySourceKey("$sourcePrefix$oldId")
+                else -> null
+            }
+        }
+        return encodeIdList(local)
     }
 
     private fun copyMedia(

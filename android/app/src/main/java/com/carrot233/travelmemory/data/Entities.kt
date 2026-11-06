@@ -107,6 +107,8 @@ data class StoryEntity(
     val content: String,
     @ColumnInfo(name = "cover_url") val coverUrl: String? = null,
     val location: String? = null,
+    @ColumnInfo(name = "photo_ids") val photoIds: String? = null,
+    @ColumnInfo(name = "route_ids") val routeIds: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: String,
     @ColumnInfo(name = "source_key") val sourceKey: String? = null,
 )

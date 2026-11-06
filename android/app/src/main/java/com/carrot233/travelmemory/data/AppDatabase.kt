@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -13,7 +15,7 @@ import androidx.room.RoomDatabase
         VideoEntity::class,
         StoryEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,7 +30,16 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun storageDao(): StorageDao
 
     companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE stories ADD COLUMN photo_ids TEXT")
+                db.execSQL("ALTER TABLE stories ADD COLUMN route_ids TEXT")
+            }
+        }
+
         fun build(context: Context, name: String = "travel_memory.db"): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, name)
+                .addMigrations(MIGRATION_1_2)
+                .build()
     }
 }

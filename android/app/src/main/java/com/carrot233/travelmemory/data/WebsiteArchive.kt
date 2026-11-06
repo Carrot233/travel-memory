@@ -76,8 +76,32 @@ data class ImportedStory(
     val content: String,
     val coverUrl: String?,
     val location: String?,
+    val photoIds: List<Long>,
+    val routeIds: List<Long>,
     val createdAt: String?,
 )
+
+fun parseIdList(raw: String?): List<Long> {
+    val text = raw?.trim().orEmpty()
+    if (text.isEmpty() || text == "null" || text == "[]") return emptyList()
+    val body = text.removePrefix("[").removeSuffix("]")
+    if (body.isBlank()) return emptyList()
+    return body.split(',')
+        .mapNotNull { part ->
+            val token = part.trim().trim('"')
+            if (token.isEmpty()) null else token.toLongOrNull() ?: token.toDoubleOrNull()?.toLong()
+        }
+        .distinct()
+}
+
+fun encodeIdList(ids: List<Long>): String? {
+    val unique = ids.distinct().filter { it > 0 }
+    if (unique.isEmpty()) return null
+    return unique.joinToString(prefix = "[", postfix = "]", separator = ",")
+}
+
+fun remapStoredIds(raw: String?, localByOldId: Map<Long, Long>): String? =
+    encodeIdList(parseIdList(raw).mapNotNull { localByOldId[it] })
 
 data class WebsiteDump(
     val routes: List<ImportedRoute>,
@@ -271,6 +295,8 @@ private fun Row.toStory(): ImportedStory? {
         content = text("content") ?: "",
         coverUrl = text("cover_url"),
         location = text("location"),
+        photoIds = parseIdList(text("photo_ids")),
+        routeIds = parseIdList(text("route_ids")),
         createdAt = text("created_at"),
     )
 }

@@ -1,5 +1,14 @@
 package com.carrot233.travelmemory.ui
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -16,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -82,6 +92,10 @@ fun TravelApp() {
             navController = nav,
             startDestination = Routes.HOME,
             modifier = Modifier.padding(padding),
+            enterTransition = { enterTravel() },
+            exitTransition = { exitTravel() },
+            popEnterTransition = { popEnterTravel() },
+            popExitTransition = { popExitTravel() },
         ) {
             composable(Routes.HOME) { HomeScreen(nav) }
             composable(Routes.PHOTOS) { PhotoListScreen(nav) }
@@ -143,4 +157,34 @@ fun TravelApp() {
             composable(Routes.SETTINGS) { SettingsScreen(nav) }
         }
     }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTabChange(): Boolean {
+    val from = initialState.destination.route
+    val to = targetState.destination.route
+    return from in Routes.topLevel && to in Routes.topLevel
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.enterTravel(): EnterTransition {
+    val fade = fadeIn(tween(200, easing = FastOutSlowInEasing))
+    if (isTabChange()) return fade
+    return fade + slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { it / 5 }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.exitTravel(): ExitTransition {
+    val fade = fadeOut(tween(160, easing = FastOutSlowInEasing))
+    if (isTabChange()) return fade
+    return fade + slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { -it / 6 }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.popEnterTravel(): EnterTransition {
+    val fade = fadeIn(tween(200, easing = FastOutSlowInEasing))
+    if (isTabChange()) return fade
+    return fade + slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { -it / 5 }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.popExitTravel(): ExitTransition {
+    val fade = fadeOut(tween(160, easing = FastOutSlowInEasing))
+    if (isTabChange()) return fade
+    return fade + slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { it / 5 }
 }

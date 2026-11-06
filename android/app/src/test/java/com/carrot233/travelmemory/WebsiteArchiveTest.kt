@@ -1,5 +1,8 @@
 package com.carrot233.travelmemory
 
+import com.carrot233.travelmemory.data.encodeIdList
+import com.carrot233.travelmemory.data.parseIdList
+import com.carrot233.travelmemory.data.remapStoredIds
 import com.carrot233.travelmemory.data.Row
 import com.carrot233.travelmemory.data.TabularDb
 import com.carrot233.travelmemory.data.chooseDatabaseEntry
@@ -52,7 +55,15 @@ class WebsiteArchiveTest {
                         Row(mapOf("id" to "5", "title" to "游船", "url" to "https://example.com/video.mp4")),
                     )
                     "stories" -> listOf(
-                        Row(mapOf("id" to "6", "title" to "雨", "content" to "下雨了")),
+                        Row(
+                            mapOf(
+                                "id" to "6",
+                                "title" to "雨",
+                                "content" to "下雨了",
+                                "photo_ids" to "[4, 9]",
+                                "route_ids" to "[3]",
+                            ),
+                        ),
                     )
                     else -> emptyList()
                 }
@@ -67,6 +78,8 @@ class WebsiteArchiveTest {
         assertEquals(3L, dump.photos.single().oldRouteId)
         assertEquals("游船", dump.videos.single().title)
         assertEquals("下雨了", dump.stories.single().content)
+        assertEquals(listOf(4L, 9L), dump.stories.single().photoIds)
+        assertEquals(listOf(3L), dump.stories.single().routeIds)
         assertTrue(queried.none { it.contains("users") || it.contains("password") })
         assertNull(matchZipEntry(listOf("public/uploads/photos/a.jpg"), dump.videos.single().url))
     }
@@ -88,6 +101,18 @@ class WebsiteArchiveTest {
         assertFalse(isSafeZipEntry("uploads/../../secret"))
         assertEquals("data/travel.db", chooseDatabaseEntry(entries))
         assertTrue(importedRelativePath("photos", "website:photo:4", "public/uploads/photos/a.jpg").endsWith("_a.jpg"))
+    }
+
+    @Test
+    fun storyPhotoIdsRemapToLocalRoomIds() {
+        assertEquals(listOf(4L, 12L), parseIdList("[4, 12]"))
+        assertEquals(listOf(4L, 12L), parseIdList("4, 12"))
+        assertTrue(parseIdList(null).isEmpty())
+        assertTrue(parseIdList("[]").isEmpty())
+        val local = mapOf(4L to 40L, 12L to 41L)
+        assertEquals("[40,41]", remapStoredIds("[4, 99, 12]", local))
+        assertEquals(null, remapStoredIds("[99]", local))
+        assertEquals("[40,41]", encodeIdList(listOf(40L, 41L, 40L)))
     }
 
     @Test

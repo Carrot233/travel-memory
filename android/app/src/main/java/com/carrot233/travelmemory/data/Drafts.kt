@@ -23,6 +23,8 @@ data class StoryDraft(
     val content: String,
     val location: String?,
     val coverUrl: String?,
+    val photoIds: List<Long> = emptyList(),
+    val routeIds: List<Long> = emptyList(),
 )
 
 data class SpotDraft(

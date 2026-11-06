@@ -95,7 +95,7 @@ fun SettingsScreen(nav: NavHostController) {
             }
             Text("导入网站数据包", style = MaterialTheme.typography.titleMedium)
             Text(
-                "可以选择一个 zip，里面有 travel.db，以及 uploads 或 public/uploads 里的文件。这是一次性导入，不会同步，也不会联网。账号和密码不会被导入。",
+                "可以选择一个 zip，里面有 travel.db，以及 uploads 或 public/uploads 里的文件。这是一次性导入，不会同步，也不会联网。账号和密码不会被导入。故事关联的照片会按网站里的编号对应到本机照片；已经导入过的故事，再导入一次会补上这些照片。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(
