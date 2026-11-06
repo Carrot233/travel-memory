@@ -150,9 +150,21 @@ export default function EditRouteSpotsPage({ params }: { params: Promise<{ id: s
       // 先下载图片
       const imgRes = await fetch(imageUrl);
       const blob = await imgRes.blob();
-      
-      // 转换为 File 对象
-      const ext = imageUrl.split('.').pop() || 'jpg';
+
+      const mimeToExt: Record<string, string> = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/gif": "gif",
+        "image/webp": "webp",
+      };
+      const allowed = new Set(["jpg", "jpeg", "png", "gif", "webp"]);
+      const cleanPath = imageUrl.split("?")[0]?.split("#")[0] ?? "";
+      const urlExt = (cleanPath.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const ext = mimeToExt[blob.type] || (allowed.has(urlExt) ? urlExt : "");
+      if (!ext) {
+        return;
+      }
+
       const fileName = `auto_${Date.now()}.${ext}`;
       const file = new File([blob], fileName, { type: blob.type });
       

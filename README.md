@@ -76,6 +76,7 @@ npm run dev
 - 访问：http://localhost:3000/admin
 - 默认账号：`admin`
 - 默认密码：`admin123`
+- 部署到公网前请修改默认管理员密码
 
 ## 生产部署
 
@@ -116,6 +117,9 @@ server {
     listen 80;
     server_name your-domain.com; # 或服务器 IP
 
+    client_max_body_size 200m;
+
+    # 全部请求（含上传文件）都交给 Next.js。不要为该站点启用 PHP 或其他脚本解释器。
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -150,10 +154,19 @@ travel-site/
 │   ├── lib/              # 工具函数和配置
 │   └── types/            # TypeScript 类型定义
 ├── public/               # 静态资源
-│   └── uploads/          # 上传的图片/视频
-├── data/                 # SQLite 数据库
+│   └── uploads/          # 历史上传的图片（仅作媒体读取）
+├── data/                 # SQLite 数据库与新上传的媒体
+│   └── uploads/          # 新上传的图片/视频（不在静态目录中）
 └── package.json
 ```
+
+## 上传文件
+
+照片和视频只接受真实媒体：图片为 JPG、PNG、GIF、WEBP（不超过 20MB），视频为 MP4、WEBM、OGG（不超过 200MB）。服务端会同时检查扩展名和文件内容，不信任浏览器自行声明的类型。脚本类扩展名会被拒绝。
+
+新文件保存在 `data/uploads/`，通过应用以对应的媒体类型返回（`Content-Disposition: inline`，并禁止内容嗅探）。该目录不在 `public/` 下，不会被当作网站脚本执行。请不要把 `data/uploads/` 里的个人媒体提交到仓库。
+
+如果本机 `public/uploads/` 中有并非照片或视频的脚本文件（例如扩展名是 `.php`），请在确认后删除，不要提交。
 
 ## 常用命令
 
@@ -162,6 +175,7 @@ npm run dev      # 启动开发服务器
 npm run build    # 构建生产版本
 npm run start    # 启动生产服务器
 npm run lint     # 代码检查
+npm run test     # 上传校验测试
 ```
 
 ## 许可证
