@@ -39,6 +39,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -347,17 +348,21 @@ private fun SpotDialog(
     var searching by remember { mutableStateOf(false) }
     var searchNote by remember { mutableStateOf<String?>(null) }
     var suggestions by remember { mutableStateOf<List<PlaceSuggestion>>(emptyList()) }
+    val context = LocalContext.current
     val searchReady = remember { AmapPlaceSearch.isConfigured() }
     val scope = rememberCoroutineScope()
+    DisposableEffect(Unit) {
+        onDispose { AmapPlaceSearch.close() }
+    }
     fun searchPlace() {
         if (!searchReady || placeQuery.isBlank() || searching) return
         scope.launch {
             searching = true
             searchNote = null
-            when (val outcome = AmapPlaceSearch.search(placeQuery)) {
+            when (val outcome = AmapPlaceSearch.search(context, placeQuery)) {
                 PlaceSearchOutcome.Unavailable -> {
                     suggestions = emptyList()
-                    searchNote = "地点搜索不可用：构建时未配置 AMAP_KEY。仍可手动填写经纬度。"
+                    searchNote = AmapPlaceSearch.unavailableMessage()
                 }
                 PlaceSearchOutcome.Empty -> {
                     suggestions = emptyList()
@@ -399,7 +404,7 @@ private fun SpotDialog(
                     }
                 } else {
                     Text(
-                        "地点搜索不可用：构建时未配置 AMAP_KEY。仍可手动填写经纬度。",
+                        AmapPlaceSearch.unavailableMessage(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
