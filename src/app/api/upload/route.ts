@@ -1,64 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
+import { saveUpload } from "@/lib/media-storage";
+import {
+  buildStoredFileName,
+  isUploadCategory,
+  validateMediaUpload,
+} from "@/lib/media-upload";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const type = formData.get("type") as string || "photos"; // photos, videos, thumbnails
+    const file = formData.get("file");
+    const typeValue = formData.get("type");
+    const type = typeof typeValue === "string" && typeValue ? typeValue : "photos";
 
-    if (!file) {
+    if (!(file instanceof File)) {
       return NextResponse.json({ error: "未找到文件" }, { status: 400 });
     }
 
-    // 验证文件类型
-    const allowedImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    const allowedVideoTypes = ["video/mp4", "video/webm", "video/ogg"];
-    
-    const isImage = allowedImageTypes.includes(file.type);
-    const isVideo = allowedVideoTypes.includes(file.type);
-    
-    if (type === "photos" && !isImage) {
-      return NextResponse.json({ error: "只支持 JPG、PNG、GIF、WEBP 格式的图片" }, { status: 400 });
-    }
-    
-    if (type === "videos" && !isVideo) {
-      return NextResponse.json({ error: "只支持 MP4、WEBM、OGG 格式的视频" }, { status: 400 });
-    }
-    
-    if (type === "thumbnails" && !isImage) {
-      return NextResponse.json({ error: "封面图必须是图片格式" }, { status: 400 });
+    if (!isUploadCategory(type)) {
+      return NextResponse.json({ error: "不支持的上传类型" }, { status: 400 });
     }
 
-    // 生成文件名：时间戳_随机数.扩展名
-    const ext = file.name.split(".").pop() || "bin";
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    const fileName = `${timestamp}_${random}.${ext}`;
-
-    // 确保目录存在
-    const uploadDir = path.join(process.cwd(), "public", "uploads", type);
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+    const verdict = await validateMediaUpload(file, type);
+    if (!verdict.ok) {
+      return NextResponse.json({ error: verdict.error }, { status: 400 });
     }
 
-    // 写入文件
-    const filePath = path.join(uploadDir, fileName);
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
+    const fileName = buildStoredFileName(verdict.extension);
+    await saveUpload(type, fileName, verdict.buffer);
 
-    // 返回可访问的 URL（使用 API 路由以确保生产模式下可访问）
     const url = `/api/uploads/${type}/${fileName}`;
-
     return NextResponse.json({
       success: true,
       url,
       fileName,
-      size: file.size,
-      type: file.type,
+      size: verdict.buffer.length,
+      type: verdict.contentType,
     });
   } catch (error) {
     console.error("上传错误:", error);

@@ -8,11 +8,16 @@ node_modules/
 out/
 build/
 dist/
+*.tsbuildinfo
 
 # Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Newly uploaded media (personal). Legacy photos already in public/uploads stay tracked.
+data/uploads/**
+!data/uploads/.gitkeep
 
 # Local env files
 .env
