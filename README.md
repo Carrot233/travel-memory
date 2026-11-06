@@ -164,6 +164,10 @@ npm run start    # 启动生产服务器
 npm run lint     # 代码检查
 ```
 
+## Android 客户端
+
+`android/` 是独立的 Android 应用「旅途记忆」。照片、路线、视频和故事都保存在本机，不连接本网站的 API，也不需要填写服务器地址。打开与构建见 [android/README.md](android/README.md)。
+
 ## 许可证
 
 MIT License
