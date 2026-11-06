@@ -84,7 +84,7 @@ fun RouteDiagram(spots: List<RouteSpotEntity>, modifier: Modifier = Modifier) {
         if (located.isNotEmpty()) {
             CoordMap(located)
             Text(
-                "本地示意图，按经纬度绘制，不需要地图密钥",
+                "本地示意图，不需要地图密钥。靠得很近的点会分开画，整条路线仍然都在图里。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -99,14 +99,22 @@ fun RouteDiagram(spots: List<RouteSpotEntity>, modifier: Modifier = Modifier) {
 private fun CoordMap(spots: List<RouteSpotEntity>) {
     val density = LocalDensity.current
     var size by remember { mutableStateOf(IntSize.Zero) }
+    val markerRadius = with(density) { 8.dp.toPx() }
+    val minSeparation = with(density) { 36.dp.toPx() }
+    val labelHeight = with(density) { 16.dp.toPx() }
     val projected = if (size.width == 0 || size.height == 0) {
         emptyList()
     } else {
-        projectSpots(
+        layoutRouteMarkers(
             points = spots.map { GeoPoint(it.id, it.latitude ?: 0.0, it.longitude ?: 0.0) },
+            labelWidths = spots.map { spot ->
+                with(density) { (spot.name.length * 14).dp.toPx().coerceAtMost(108.dp.toPx()) }
+            },
+            labelHeight = labelHeight,
             width = size.width.toFloat(),
             height = size.height.toFloat(),
-            padding = with(density) { 32.dp.toPx() },
+            padding = with(density) { 40.dp.toPx() },
+            minSeparation = minSeparation,
         )
     }
     val lookup = spots.associateBy { it.id }
@@ -129,13 +137,13 @@ private fun CoordMap(spots: List<RouteSpotEntity>) {
                     drawPath(
                         path,
                         color = Color(0xFF1D6FE8),
-                        style = Stroke(width = 6f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        style = Stroke(width = with(density) { 2.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round),
                     )
                 }
                 projected.forEach { point ->
                     val spot = lookup[point.key] ?: return@forEach
-                    drawCircle(dayColor(spot.dayNumber), radius = 16f, center = Offset(point.x, point.y))
-                    drawCircle(Color.White, radius = 6f, center = Offset(point.x, point.y))
+                    drawCircle(dayColor(spot.dayNumber), radius = markerRadius, center = Offset(point.x, point.y))
+                    drawCircle(Color.White, radius = markerRadius * 0.38f, center = Offset(point.x, point.y))
                 }
             }
             projected.forEach { point ->
@@ -143,8 +151,8 @@ private fun CoordMap(spots: List<RouteSpotEntity>) {
                 Text(
                     spot.name,
                     modifier = Modifier.padding(
-                        start = with(density) { point.x.toDp() } + 12.dp,
-                        top = with(density) { (point.y - 28f).coerceAtLeast(0f).toDp() },
+                        start = with(density) { point.labelX.toDp() },
+                        top = with(density) { point.labelY.toDp() },
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
