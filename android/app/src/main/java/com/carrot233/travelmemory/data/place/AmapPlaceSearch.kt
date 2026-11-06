@@ -1,12 +1,25 @@
 package com.carrot233.travelmemory.data.place
 
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.ViewGroup
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import com.carrot233.travelmemory.BuildConfig
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.withTimeout
+import java.lang.ref.WeakReference
 
 sealed interface PlaceSearchOutcome {
     data object Unavailable : PlaceSearchOutcome
@@ -16,52 +29,138 @@ sealed interface PlaceSearchOutcome {
 }
 
 object AmapPlaceSearch {
-    fun isConfigured(): Boolean = BuildConfig.AMAP_KEY.isNotBlank()
+    private const val unavailableMessage =
+        "地点搜索不可用：构建时未配置 AMAP_KEY 或 AMAP_SECURITY_CODE。仍可手动填写经纬度。"
 
-    suspend fun search(keyword: String): PlaceSearchOutcome = withContext(Dispatchers.IO) {
-        val key = BuildConfig.AMAP_KEY
-        if (key.isBlank()) return@withContext PlaceSearchOutcome.Unavailable
+    private val gate = Mutex()
+    private var webView: WebView? = null
+    private var host: WeakReference<Activity>? = null
+    private var ready = CompletableDeferred<Unit>()
+    private var pending: CompletableDeferred<PlaceSearchOutcome>? = null
+
+    fun isConfigured(): Boolean =
+        BuildConfig.AMAP_KEY.isNotBlank() && BuildConfig.AMAP_SECURITY_CODE.isNotBlank()
+
+    fun unavailableMessage(): String = unavailableMessage
+
+    suspend fun search(context: Context, keyword: String): PlaceSearchOutcome {
+        if (!isConfigured()) return PlaceSearchOutcome.Unavailable
         val query = keyword.trim()
-        if (query.isEmpty()) return@withContext PlaceSearchOutcome.Empty
-        val url = buildInputTipsUrl(key, query)
-        val body = try {
-            readHttps(url)
-        } catch (error: Exception) {
-            return@withContext PlaceSearchOutcome.Failed("搜索失败，请检查网络后重试")
-        }
-        when (val parsed = parseAmapInputTips(body)) {
-            is AmapTipsParse.Error -> PlaceSearchOutcome.Failed(parsed.message)
-            is AmapTipsParse.Ok -> if (parsed.places.isEmpty()) {
-                PlaceSearchOutcome.Empty
-            } else {
-                PlaceSearchOutcome.Hits(parsed.places)
+        if (query.isEmpty()) return PlaceSearchOutcome.Empty
+        return gate.withLock {
+            withContext(Dispatchers.Main) {
+                try {
+                    val view = ensureWebView(context)
+                    withTimeout(20_000) { ready.await() }
+                    val result = CompletableDeferred<PlaceSearchOutcome>()
+                    pending = result
+                    view.evaluateJavascript("startSearch(${jsStringLiteral(query)})", null)
+                    withTimeout(12_000) { result.await() }
+                } catch (error: TimeoutCancellationException) {
+                    PlaceSearchOutcome.Failed("搜索失败，请检查网络后重试")
+                } catch (error: Exception) {
+                    PlaceSearchOutcome.Failed("搜索失败，请重试")
+                } finally {
+                    pending = null
+                }
             }
         }
     }
-}
 
-internal fun buildInputTipsUrl(key: String, keyword: String): String {
-    val encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8.name())
-    val encodedKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8.name())
-    return "https://restapi.amap.com/v3/assistant/inputtips?key=$encodedKey&keywords=$encodedKeyword&datatype=all"
-}
-
-private fun readHttps(url: String): String {
-    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-        requestMethod = "GET"
-        connectTimeout = 8000
-        readTimeout = 8000
-        setRequestProperty("Accept", "application/json")
-        setRequestProperty("User-Agent", "TravelMemoryAndroid")
+    fun close() {
+        val view = webView ?: return
+        (view.parent as? ViewGroup)?.removeView(view)
+        view.destroy()
+        webView = null
+        host = null
+        ready = CompletableDeferred()
+        pending?.complete(PlaceSearchOutcome.Failed("搜索失败，请重试"))
+        pending = null
     }
-    try {
-        val stream = if (connection.responseCode in 200..299) {
-            connection.inputStream
-        } else {
-            connection.errorStream ?: connection.inputStream
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun ensureWebView(context: Context): WebView {
+        val activity = findActivity(context)
+        val existing = webView
+        if (existing != null && (activity == null || host?.get() === activity)) return existing
+        existing?.let { previous ->
+            (previous.parent as? ViewGroup)?.removeView(previous)
+            previous.destroy()
+            ready = CompletableDeferred()
         }
-        return stream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
-    } finally {
-        connection.disconnect()
+        val created = WebView(activity ?: context.applicationContext)
+        created.settings.javaScriptEnabled = true
+        created.settings.domStorageEnabled = true
+        created.addJavascriptInterface(Bridge(), "AndroidBridge")
+        created.webViewClient = object : WebViewClient() {
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceError,
+            ) {
+                if (request.isForMainFrame) {
+                    fail("搜索失败，请检查网络后重试")
+                }
+            }
+        }
+        if (activity != null) {
+            (activity.window.decorView as ViewGroup).addView(
+                created,
+                FrameLayout.LayoutParams(1, 1),
+            )
+            created.alpha = 0f
+        }
+        val html = context.assets.open("amap_search.html").bufferedReader().use { it.readText() }
+            .replace("{{AMAP_KEY}}", BuildConfig.AMAP_KEY)
+            .replace("{{AMAP_SECURITY_CODE}}", BuildConfig.AMAP_SECURITY_CODE)
+        created.loadDataWithBaseURL(
+            "https://webapi.amap.com/",
+            html,
+            "text/html",
+            "UTF-8",
+            null,
+        )
+        webView = created
+        host = activity?.let { WeakReference(it) }
+        return created
+    }
+
+    private fun fail(message: String) {
+        pending?.complete(PlaceSearchOutcome.Failed(message))
+        if (!ready.isCompleted) ready.complete(Unit)
+    }
+
+    private class Bridge {
+        @JavascriptInterface
+        fun onReady() {
+            if (!ready.isCompleted) ready.complete(Unit)
+        }
+
+        @JavascriptInterface
+        fun onResults(json: String) {
+            val places = parsePlaceSuggestions(json)
+            pending?.complete(
+                if (places.isEmpty()) PlaceSearchOutcome.Empty else PlaceSearchOutcome.Hits(places),
+            )
+        }
+
+        @JavascriptInterface
+        fun onFailure(message: String) {
+            pending?.complete(PlaceSearchOutcome.Failed(publicFailure(message)))
+        }
+    }
+
+    private fun publicFailure(message: String): String {
+        if (Regex("[A-Za-z0-9]{8,}").containsMatchIn(message)) return "搜索失败，请重试"
+        return message.take(40).ifBlank { "搜索失败，请重试" }
+    }
+
+    private fun findActivity(context: Context): Activity? {
+        var current = context
+        while (current is ContextWrapper) {
+            if (current is Activity) return current
+            current = current.baseContext
+        }
+        return null
     }
 }

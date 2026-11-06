@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<script>
+  window._AMapSecurityConfig = { securityJsCode: "{{AMAP_SECURITY_CODE}}" };
+</script>
+<script src="https://webapi.amap.com/maps?v=2.0&key={{AMAP_KEY}}&plugin=AMap.AutoComplete"></script>
+<script>
+  function notifyReady() {
+    if (window.AMap && window.AMap.AutoComplete) {
+      AndroidBridge.onReady();
+    } else {
+      setTimeout(notifyReady, 80);
+    }
+  }
+  function startSearch(keyword) {
+    try {
+      var ac = new AMap.AutoComplete({
+        city: "全国",
+        citylimit: false,
+        type: "风景名胜|商务住宅|风景名胜|交通设施"
+      });
+      ac.search(keyword, function (status, result) {
+        if (status === "complete" && result && result.tips) {
+          var tips = [];
+          for (var i = 0; i < result.tips.length && tips.length < 5; i++) {
+            var tip = result.tips[i];
+            if (!tip || !tip.location || !tip.location.lng || !tip.location.lat) continue;
+            tips.push({
+              name: tip.name || "",
+              address: typeof tip.address === "string" ? tip.address : "",
+              district: typeof tip.district === "string" ? tip.district : "",
+              latitude: tip.location.lat,
+              longitude: tip.location.lng
+            });
+          }
+          AndroidBridge.onResults(JSON.stringify(tips));
+        } else if (status === "no_data") {
+          AndroidBridge.onResults("[]");
+        } else {
+          AndroidBridge.onFailure("搜索失败，请重试");
+        }
+      });
+    } catch (e) {
+      AndroidBridge.onFailure("搜索失败，请重试");
+    }
+  }
+  notifyReady();
+</script>
+</body>
+</html>

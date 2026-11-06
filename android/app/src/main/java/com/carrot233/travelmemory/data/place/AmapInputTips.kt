@@ -10,27 +10,14 @@ data class PlaceSuggestion(
     fun subtitle(): String = listOfNotNull(address, district).joinToString(" · ")
 }
 
-sealed interface AmapTipsParse {
-    data class Ok(val places: List<PlaceSuggestion>) : AmapTipsParse
-    data class Error(val message: String) : AmapTipsParse
-}
-
-fun parseAmapInputTips(body: String): AmapTipsParse {
-    val status = jsonStringField(body, "status")
-    if (status == "0") {
-        return AmapTipsParse.Error("搜索失败，请检查 AMAP_KEY 是否有效")
-    }
-    val places = extractTipsObjects(body).mapNotNull { tip -> tip.toSuggestion() }.take(5)
-    return AmapTipsParse.Ok(places)
+fun parsePlaceSuggestions(body: String): List<PlaceSuggestion> {
+    return extractJsonObjects(body).mapNotNull { it.toSuggestion() }.take(5)
 }
 
 private fun String.toSuggestion(): PlaceSuggestion? {
     val name = jsonStringField(this, "name")?.takeIf { it.isNotBlank() } ?: return null
-    val location = jsonStringField(this, "location") ?: return null
-    val parts = location.split(',')
-    if (parts.size != 2) return null
-    val longitude = parts[0].trim().toDoubleOrNull() ?: return null
-    val latitude = parts[1].trim().toDoubleOrNull() ?: return null
+    val latitude = jsonNumberField(this, "latitude") ?: return null
+    val longitude = jsonNumberField(this, "longitude") ?: return null
     if (latitude !in -90.0..90.0 || longitude !in -180.0..180.0) return null
     return PlaceSuggestion(
         name = name,
@@ -47,20 +34,17 @@ private fun String?.blankPlaceText(): String? {
     return text
 }
 
-internal fun extractTipsObjects(json: String): List<String> {
-    val marker = Regex(""""tips"\s*:\s*\[""").find(json) ?: return emptyList()
-    var index = marker.range.last + 1
+internal fun extractJsonObjects(json: String): List<String> {
     val objects = mutableListOf<String>()
+    var index = 0
     while (index < json.length) {
-        while (index < json.length && (json[index].isWhitespace() || json[index] == ',')) index++
-        if (index >= json.length || json[index] == ']') break
-        if (json[index] != '{') {
+        if (json[index] == '{') {
+            val end = matchingBrace(json, index) ?: break
+            objects += json.substring(index, end + 1)
+            index = end + 1
+        } else {
             index++
-            continue
         }
-        val end = matchingBrace(json, index) ?: break
-        objects += json.substring(index, end + 1)
-        index = end + 1
     }
     return objects
 }
@@ -99,6 +83,11 @@ internal fun jsonStringField(objectText: String, field: String): String? {
     return unescapeJson(raw)
 }
 
+private fun jsonNumberField(objectText: String, field: String): Double? {
+    val pattern = Regex(""""${Regex.escape(field)}"\s*:\s*(-?\d+(?:\.\d+)?)""")
+    return pattern.find(objectText)?.groupValues?.get(1)?.toDoubleOrNull()
+}
+
 private fun unescapeJson(raw: String): String {
     val out = StringBuilder()
     var index = 0
@@ -132,5 +121,21 @@ private fun unescapeJson(raw: String): String {
             index++
         }
     }
+    return out.toString()
+}
+
+internal fun jsStringLiteral(value: String): String {
+    val out = StringBuilder("\"")
+    value.forEach { char ->
+        when (char) {
+            '\\' -> out.append("\\\\")
+            '"' -> out.append("\\\"")
+            '\n' -> out.append("\\n")
+            '\r' -> out.append("\\r")
+            '<' -> out.append("\\u003c")
+            else -> out.append(char)
+        }
+    }
+    out.append('"')
     return out.toString()
 }

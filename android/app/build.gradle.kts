@@ -18,7 +18,9 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val amapKey = readBuildSetting("AMAP_KEY")
+        val amapSecurityCode = readBuildSetting("AMAP_SECURITY_CODE")
         buildConfigField("String", "AMAP_KEY", "\"$amapKey\"")
+        buildConfigField("String", "AMAP_SECURITY_CODE", "\"$amapSecurityCode\"")
     }
 
     compileOptions {

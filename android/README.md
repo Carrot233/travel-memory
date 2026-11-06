@@ -31,7 +31,7 @@ cd android
 - 照片、视频和封面复制到应用私有目录 `files/media/`，不依赖相册里的原文件是否还在。
 - 可以新增、编辑、删除照片、路线、视频和故事。
 - 路线图用景点的经纬度在本地画出来，不使用地图 SDK。
-- 添加或编辑景点时可以搜索地名。搜索走高德输入提示接口（和网站 `LocationPicker` 的 AutoComplete 相同）。Key 不写进代码：在 `android/local.properties`（已忽略）或 Gradle 参数里设置 `AMAP_KEY`。示例见 `local.properties.example`。未配置时应用会提示搜索不可用，经纬度仍可手填。
+- 添加或编辑景点时可以搜索地名。搜索在隐藏的 WebView 里加载高德 JS SDK，并调用与网站 `LocationPicker` 相同的 `AMap.AutoComplete`（需要 JS API 的 key 和 securityJsCode，不是 Web 服务 REST key）。在 `android/local.properties`（已忽略）、Gradle 参数或环境变量里设置 `AMAP_KEY` 和 `AMAP_SECURITY_CODE`。示例见 `local.properties.example`。缺一不可时应用会提示搜索不可用，经纬度仍可手填。
 - 深色模式在「设置」里切换，可跟随系统。
 - 没有登录，也没有账号服务器。
 
