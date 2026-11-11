@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -134,6 +135,7 @@ fun MediaImage(
     relativePath: String?,
     description: String,
     modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
 ) {
     val repository = travelRepository()
     var bitmap by remember(relativePath) { mutableStateOf<ImageBitmap?>(null) }
@@ -144,19 +146,21 @@ fun MediaImage(
             decodeSampled(file, 1280)?.asImageBitmap()
         }
     }
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap!!,
-            contentDescription = description,
-            modifier = modifier,
-            contentScale = ContentScale.Crop,
-        )
-    } else {
-        Box(
-            modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("🖼️", style = MaterialTheme.typography.headlineMedium)
+    Box(modifier, contentAlignment = Alignment.Center) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!,
+                contentDescription = description,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = contentScale,
+            )
+        } else {
+            Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("🖼️", style = MaterialTheme.typography.headlineMedium)
+            }
         }
     }
 }

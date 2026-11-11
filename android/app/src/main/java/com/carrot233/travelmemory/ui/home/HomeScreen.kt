@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.carrot233.travelmemory.ui.Routes
+import com.carrot233.travelmemory.ui.photoSharedBounds
 import com.carrot233.travelmemory.ui.components.MediaImage
 import com.carrot233.travelmemory.ui.components.TravelTopBar
 import com.carrot233.travelmemory.ui.libraryViewModel
@@ -131,7 +132,10 @@ fun HomeScreen(nav: NavHostController) {
                             MediaImage(
                                 relativePath = photo.url,
                                 description = photo.title,
-                                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .photoSharedBounds(photo.id),
                             )
                             Column(Modifier.padding(10.dp)) {
                                 Text(photo.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)

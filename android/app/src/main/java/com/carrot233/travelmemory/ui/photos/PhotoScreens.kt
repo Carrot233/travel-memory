@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -48,6 +50,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.carrot233.travelmemory.data.displayDate
 import com.carrot233.travelmemory.ui.Routes
+import com.carrot233.travelmemory.ui.photoSharedBounds
 import com.carrot233.travelmemory.ui.capture.newCaptureUri
 import com.carrot233.travelmemory.ui.capture.rememberPermissionedAction
 import com.carrot233.travelmemory.ui.components.ConfirmDeleteDialog
@@ -98,7 +103,10 @@ fun PhotoListScreen(nav: NavHostController) {
                         MediaImage(
                             relativePath = photo.url,
                             description = photo.title,
-                            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .photoSharedBounds(photo.id),
                         )
                         Column(Modifier.padding(10.dp)) {
                             Text(
@@ -139,60 +147,63 @@ fun PhotoDetailScreen(nav: NavHostController, photoId: Long) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var confirm by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize()) {
-        TravelTopBar(
-            title = photo?.title ?: "照片",
-            onBack = { nav.popBackStack() },
-            actions = {
-                val current = photo
-                if (current != null) {
-                    IconButton(onClick = {
-                        val file = repository.resolveMedia(current.url)
-                        if (file != null && file.isFile) shareFile(context, file)
-                    }) {
-                        Icon(Icons.Filled.Share, contentDescription = "分享")
-                    }
-                    IconButton(onClick = { nav.navigate("photo/${current.id}/edit") }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "编辑")
-                    }
-                    IconButton(onClick = { confirm = true }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "删除")
-                    }
-                }
-            },
-        )
-        val current = photo
+    val current = photo
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (current == null) {
-            EmptyHint("📷", "没有找到这张照片", "它可能已经被删除。")
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("没有找到这张照片", color = Color.White)
+            }
         } else {
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
-                Card {
-                    MediaImage(
-                        relativePath = current.url,
-                        description = current.title,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 420.dp),
-                    )
-                }
-                Text(
-                    current.title,
-                    modifier = Modifier.padding(top = 16.dp),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
+            MediaImage(
+                relativePath = current.url,
+                description = current.title,
+                modifier = Modifier.fillMaxSize().photoSharedBounds(current.id),
+                contentScale = ContentScale.Fit,
+            )
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            ) {
+                Text(current.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 val meta = listOfNotNull(
                     current.location?.takeIf { it.isNotBlank() },
                     displayDate(current.takenAt).takeIf { it.isNotBlank() }?.let { "拍摄于 $it" },
                     displayDate(current.createdAt).takeIf { it.isNotBlank() }?.let { "记录于 $it" },
                 )
                 if (meta.isNotEmpty()) {
-                    Text(
-                        meta.joinToString(" · "),
-                        modifier = Modifier.padding(top = 6.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Text(meta.joinToString(" · "), color = Color.White.copy(alpha = 0.85f), modifier = Modifier.padding(top = 4.dp))
                 }
                 if (!current.description.isNullOrBlank()) {
-                    Text(current.description, modifier = Modifier.padding(top = 12.dp))
+                    Text(current.description, color = Color.White.copy(alpha = 0.92f), modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        }
+        Row(
+            Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = { nav.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
+            }
+            Box(Modifier.weight(1f))
+            if (current != null) {
+                IconButton(onClick = {
+                    val file = repository.resolveMedia(current.url)
+                    if (file != null && file.isFile) shareFile(context, file)
+                }) {
+                    Icon(Icons.Filled.Share, contentDescription = "分享", tint = Color.White)
+                }
+                IconButton(onClick = { nav.navigate("photo/${current.id}/edit") }) {
+                    Icon(Icons.Filled.Edit, contentDescription = "编辑", tint = Color.White)
+                }
+                IconButton(onClick = { confirm = true }) {
+                    Icon(Icons.Filled.Delete, contentDescription = "删除", tint = Color.White)
                 }
             }
         }

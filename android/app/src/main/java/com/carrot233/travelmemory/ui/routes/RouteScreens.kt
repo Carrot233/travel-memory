@@ -62,6 +62,7 @@ import com.carrot233.travelmemory.data.place.PlaceSearchOutcome
 import com.carrot233.travelmemory.data.place.PlaceSuggestion
 import java.util.Locale
 import com.carrot233.travelmemory.ui.Routes
+import com.carrot233.travelmemory.ui.photoSharedBounds
 import com.carrot233.travelmemory.ui.components.ConfirmDeleteDialog
 import com.carrot233.travelmemory.ui.components.EmptyHint
 import com.carrot233.travelmemory.ui.components.MediaImage
@@ -187,7 +188,10 @@ fun RouteDetailScreen(nav: NavHostController, routeId: Long) {
                                 MediaImage(
                                     relativePath = photo.url,
                                     description = photo.title,
-                                    modifier = Modifier.height(72.dp).fillMaxWidth(0.28f),
+                                    modifier = Modifier
+                                        .height(72.dp)
+                                        .fillMaxWidth(0.28f)
+                                        .photoSharedBounds(photo.id),
                                 )
                                 Text(photo.title, modifier = Modifier.padding(12.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }

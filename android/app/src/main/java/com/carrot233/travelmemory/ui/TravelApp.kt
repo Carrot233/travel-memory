@@ -1,9 +1,12 @@
 package com.carrot233.travelmemory.ui
 
+import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Home
@@ -32,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
@@ -76,6 +81,7 @@ fun NavHostController.openSection(route: String) {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun TravelApp() {
     val nav = rememberNavController()
@@ -86,27 +92,35 @@ fun TravelApp() {
     Box(Modifier.fillMaxSize()) {
         Scaffold(contentWindowInsets = WindowInsets.safeDrawing) { padding ->
             val enter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-                if (isTabChange()) tabEnter() else pageEnter()
+                forwardEnter()
             }
             val exit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-                if (isTabChange()) tabExit() else pageExit()
+                forwardExit()
             }
             val popEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-                if (isTabChange()) tabEnter() else pagePopEnter()
+                backEnter()
             }
             val popExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-                if (isTabChange()) tabExit() else pagePopExit()
+                backExit()
             }
             val predictiveEnter: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> EnterTransition = {
-                if (isTabChange()) tabEnter() else pagePopEnter()
+                backEnter()
             }
             val predictiveExit: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> ExitTransition = { edge ->
-                if (isTabChange()) tabExit() else pagePredictivePopExit(edge)
+                predictiveBackExit(edge)
             }
+            Box(
+                Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .background(Color.Black),
+            ) {
+            SharedTransitionLayout(Modifier.fillMaxSize()) {
+            CompositionLocalProvider(LocalSharedTransitionScope provides this) {
             NavHost(
                 navController = nav,
                 startDestination = Routes.HOME,
-                modifier = Modifier.padding(padding).fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 enterTransition = enter,
                 exitTransition = exit,
                 popEnterTransition = popEnter,
@@ -115,68 +129,71 @@ fun TravelApp() {
                 predictivePopExitTransition = predictiveExit,
                 sizeTransform = { null },
             ) {
-                composable(Routes.HOME) { TabPage { HomeScreen(nav) } }
-                composable(Routes.PHOTOS) { TabPage { PhotoListScreen(nav) } }
-                composable(Routes.PHOTO_NEW) { Page { PhotoEditScreen(nav, null) } }
+                composable(Routes.HOME) { Motion { TabPage { HomeScreen(nav) } } }
+                composable(Routes.PHOTOS) { Motion { TabPage { PhotoListScreen(nav) } } }
+                composable(Routes.PHOTO_NEW) { Motion { Page { PhotoEditScreen(nav, null) } } }
                 composable(
                     route = Routes.PHOTO_EDIT,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
-                    Page { PhotoEditScreen(nav, entry.arguments?.getLong("id")) }
+                    Motion { Page { PhotoEditScreen(nav, entry.arguments?.getLong("id")) } }
                 }
                 composable(
                     route = Routes.PHOTO,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
                     val id = entry.arguments?.getLong("id") ?: return@composable
-                    Page { PhotoDetailScreen(nav, id) }
+                    Motion { ViewerPage { PhotoDetailScreen(nav, id) } }
                 }
-                composable(Routes.ROUTES) { TabPage { RouteListScreen(nav) } }
-                composable(Routes.ROUTE_NEW) { Page { RouteEditScreen(nav, null) } }
+                composable(Routes.ROUTES) { Motion { TabPage { RouteListScreen(nav) } } }
+                composable(Routes.ROUTE_NEW) { Motion { Page { RouteEditScreen(nav, null) } } }
                 composable(
                     route = Routes.ROUTE_EDIT,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
-                    Page { RouteEditScreen(nav, entry.arguments?.getLong("id")) }
+                    Motion { Page { RouteEditScreen(nav, entry.arguments?.getLong("id")) } }
                 }
                 composable(
                     route = Routes.ROUTE,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
                     val id = entry.arguments?.getLong("id") ?: return@composable
-                    Page { RouteDetailScreen(nav, id) }
+                    Motion { Page { RouteDetailScreen(nav, id) } }
                 }
-                composable(Routes.VIDEOS) { TabPage { VideoListScreen(nav) } }
-                composable(Routes.VIDEO_NEW) { Page { VideoEditScreen(nav, null) } }
+                composable(Routes.VIDEOS) { Motion { TabPage { VideoListScreen(nav) } } }
+                composable(Routes.VIDEO_NEW) { Motion { Page { VideoEditScreen(nav, null) } } }
                 composable(
                     route = Routes.VIDEO_EDIT,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
-                    Page { VideoEditScreen(nav, entry.arguments?.getLong("id")) }
+                    Motion { Page { VideoEditScreen(nav, entry.arguments?.getLong("id")) } }
                 }
                 composable(
                     route = Routes.VIDEO,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
                     val id = entry.arguments?.getLong("id") ?: return@composable
-                    Page { VideoDetailScreen(nav, id) }
+                    Motion { Page { VideoDetailScreen(nav, id) } }
                 }
-                composable(Routes.STORIES) { TabPage { StoryListScreen(nav) } }
-                composable(Routes.STORY_NEW) { Page { StoryEditScreen(nav, null) } }
+                composable(Routes.STORIES) { Motion { TabPage { StoryListScreen(nav) } } }
+                composable(Routes.STORY_NEW) { Motion { Page { StoryEditScreen(nav, null) } } }
                 composable(
                     route = Routes.STORY_EDIT,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
-                    Page { StoryEditScreen(nav, entry.arguments?.getLong("id")) }
+                    Motion { Page { StoryEditScreen(nav, entry.arguments?.getLong("id")) } }
                 }
                 composable(
                     route = Routes.STORY,
                     arguments = listOf(navArgument("id") { type = NavType.LongType }),
                 ) { entry ->
                     val id = entry.arguments?.getLong("id") ?: return@composable
-                    Page { StoryDetailScreen(nav, id) }
+                    Motion { Page { StoryDetailScreen(nav, id) } }
                 }
-                composable(Routes.SETTINGS) { Page { SettingsScreen(nav) } }
+                composable(Routes.SETTINGS) { Motion { Page { SettingsScreen(nav) } } }
+            }
+            }
+            }
             }
         }
         AnimatedVisibility(
@@ -200,6 +217,11 @@ fun TravelApp() {
 }
 
 @Composable
+private fun AnimatedContentScope.Motion(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalNavMotion provides this, content = content)
+}
+
+@Composable
 private fun Page(content: @Composable () -> Unit) {
     Box(
         Modifier
@@ -208,6 +230,11 @@ private fun Page(content: @Composable () -> Unit) {
     ) {
         content()
     }
+}
+
+@Composable
+private fun ViewerPage(content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) { content() }
 }
 
 @Composable
@@ -228,23 +255,75 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTabChange(): Boo
     return from in Routes.topLevel && to in Routes.topLevel
 }
 
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.openingPhoto(): Boolean =
+    isPhotoViewer(targetState.destination.route) && !isPhotoViewer(initialState.destination.route)
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.closingPhoto(): Boolean =
+    isPhotoViewer(initialState.destination.route) && !isPhotoViewer(targetState.destination.route)
+
+internal fun isPhotoViewerRoute(route: String?): Boolean {
+    if (route == null || route == Routes.PHOTOS || route == Routes.PHOTO_NEW || route == Routes.PHOTO_EDIT) {
+        return false
+    }
+    if (route == Routes.PHOTO) return true
+    if (!route.startsWith("photo/") || route.endsWith("/edit")) return false
+    return route.removePrefix("photo/").all { it.isDigit() }
+}
+
+private fun isPhotoViewer(route: String?): Boolean = isPhotoViewerRoute(route)
+
 private fun tabEnter(): EnterTransition = fadeIn(tween(200, easing = FastOutSlowInEasing))
 
 private fun tabExit(): ExitTransition = fadeOut(tween(160, easing = FastOutSlowInEasing))
 
-private fun pageEnter(): EnterTransition =
-    slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { width -> width }
+private fun photoOpenEnter(): EnterTransition = fadeIn(weChatFade)
+
+private fun photoOpenExit(): ExitTransition = fadeOut(weChatFade, targetAlpha = 0.55f)
+
+private fun photoCloseEnter(): EnterTransition = fadeIn(weChatFade, initialAlpha = 0.55f)
+
+private fun photoCloseExit(): ExitTransition = fadeOut(weChatFade)
+
+private fun pageEnter(): EnterTransition = slideInHorizontally(weChatSlide) { width -> width }
 
 private fun pageExit(): ExitTransition =
-    slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { width -> -width }
+    slideOutHorizontally(weChatSlide) { width -> -width * 3 / 10 } + fadeOut(weChatFade, targetAlpha = 0.78f)
 
 private fun pagePopEnter(): EnterTransition =
-    slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { width -> -width }
+    slideInHorizontally(weChatSlide) { width -> -width * 3 / 10 } + fadeIn(weChatFade, initialAlpha = 0.78f)
 
-private fun pagePopExit(): ExitTransition =
-    slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { width -> width }
+private fun pagePopExit(): ExitTransition = slideOutHorizontally(weChatSlide) { width -> width }
 
-private fun pagePredictivePopExit(edge: Int): ExitTransition {
-    // 0 follows a swipe from the start edge; 1 follows a swipe from the end edge.
-    return if (edge == 1) pageExit() else pagePopExit()
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.forwardEnter(): EnterTransition = when {
+    isTabChange() -> tabEnter()
+    openingPhoto() -> photoOpenEnter()
+    else -> pageEnter()
 }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.forwardExit(): ExitTransition = when {
+    isTabChange() -> tabExit()
+    openingPhoto() -> photoOpenExit()
+    else -> pageExit()
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.backEnter(): EnterTransition = when {
+    isTabChange() -> tabEnter()
+    closingPhoto() -> photoCloseEnter()
+    else -> pagePopEnter()
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.backExit(): ExitTransition = when {
+    isTabChange() -> tabExit()
+    closingPhoto() -> photoCloseExit()
+    else -> pagePopExit()
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.predictiveBackExit(edge: Int): ExitTransition = when {
+    isTabChange() -> tabExit()
+    closingPhoto() -> photoCloseExit()
+    edge == 1 -> slideOutHorizontally(weChatSlide) { width -> -width }
+    else -> pagePopExit()
+}
+
+private val weChatSlide = tween<androidx.compose.ui.unit.IntOffset>(WeChatDurationMs, easing = WeChatEasing)
+private val weChatFade = tween<Float>(WeChatDurationMs, easing = WeChatEasing)

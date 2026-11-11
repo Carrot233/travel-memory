@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.carrot233.travelmemory.data.displayDate
 import com.carrot233.travelmemory.ui.Routes
+import com.carrot233.travelmemory.ui.photoSharedBounds
 import com.carrot233.travelmemory.ui.components.ConfirmDeleteDialog
 import com.carrot233.travelmemory.ui.components.EmptyHint
 import com.carrot233.travelmemory.ui.components.MediaImage
@@ -181,7 +182,10 @@ fun StoryDetailScreen(nav: NavHostController, storyId: Long) {
                                 MediaImage(
                                     relativePath = photo.url,
                                     description = photo.title,
-                                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1f)
+                                        .photoSharedBounds(photo.id),
                                 )
                                 Text(
                                     photo.title,
