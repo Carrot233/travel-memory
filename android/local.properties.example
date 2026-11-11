@@ -1,0 +1,9 @@
+# Copy the keys you need into local.properties. That file is not committed.
+# sdk.dir is created by Android Studio.
+# AMAP_KEY and AMAP_SECURITY_CODE are the same pair the website JS map uses
+# (Web端 JS API key + securityJsCode from https://lbs.amap.com/).
+# Leave either one empty to keep place search disabled; spots can still be saved
+# with typed coordinates.
+sdk.dir=/path/to/Android/sdk
+AMAP_KEY=
+AMAP_SECURITY_CODE=
